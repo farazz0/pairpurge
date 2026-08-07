@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PairPurge</string>
+
+    <string name="action_refresh">Refresh</string>
+    <string name="action_grant">Grant permission</string>
+    <string name="action_open_app_settings">Open app settings</string>
+    <string name="action_open_bluetooth_settings">Open Bluetooth settings</string>
+
+    <string name="permission_headline">Bluetooth permission needed</string>
+    <string name="permission_body">PairPurge needs Bluetooth access to read the devices paired with this phone.</string>
+    <string name="permission_body_denied">Permission was denied. Enable it in app settings to see your paired devices.</string>
+
+    <string name="unsupported_headline">Bluetooth unavailable</string>
+    <string name="unsupported_body">This device doesn\'t have Bluetooth, so there are no paired devices to show.</string>
+
+    <string name="disabled_headline">Bluetooth is off</string>
+    <string name="disabled_body">Turn Bluetooth on to see your paired devices, then tap Refresh.</string>
+
+    <string name="empty_headline">No paired devices</string>
+    <string name="empty_body">Devices you pair in Bluetooth settings will appear here. Tap Refresh after pairing.</string>
+
+    <plurals name="paired_device_count">
+        <item quantity="one">%d paired device</item>
+        <item quantity="other">%d paired devices</item>
+    </plurals>
+</resources>
