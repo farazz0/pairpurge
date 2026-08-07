@@ -1,0 +1,31 @@
+package com.pairpurge.app.bluetooth
+
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothManager
+import android.content.Context
+
+/** Reads real Bluetooth state from the platform. */
+class SystemBluetoothDeviceSource(context: Context) : BluetoothDeviceSource {
+
+    private val appContext = context.applicationContext
+
+    private val adapter
+        get() = appContext.getSystemService(BluetoothManager::class.java)?.adapter
+
+    override fun status(): BluetoothStatus {
+        val adapter = adapter ?: return BluetoothStatus.UNSUPPORTED
+        return if (adapter.isEnabled) BluetoothStatus.READY else BluetoothStatus.DISABLED
+    }
+
+    // The permission is checked at the call site before every refresh. Lint cannot see
+    // that, and the platform can still throw, so the SecurityException catch below is
+    // the real guard — without it an unlucky race crashes the app.
+    @SuppressLint("MissingPermission")
+    override fun bondedDevices(): List<PairedDevice> = try {
+        adapter?.bondedDevices.orEmpty().map { device ->
+            PairedDevice(name = device.name, address = device.address)
+        }
+    } catch (_: SecurityException) {
+        emptyList()
+    }
+}
