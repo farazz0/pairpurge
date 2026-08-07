@@ -40,7 +40,16 @@ or the phone is older than API 34. Useful flags:
 | --- | --- |
 | `--logs` | Tail logcat filtered to this app's process |
 | `--reset` | Wipe app data first, so the permission prompt reappears |
-| `--pair` | Print wireless-debugging pairing instructions |
+| `--devices` | List attached devices |
+| `--pair` | Wireless debugging: instructions, or `--pair IP:PORT CODE` to pair |
+| `--connect` | `--connect IP:PORT` to attach over Wi-Fi |
+
+`adb` does not need to be on your `PATH` — the script finds it inside the SDK. To
+use it directly anyway, add this to `~/.zshrc`:
+
+```bash
+export PATH="$HOME/Library/Android/sdk/platform-tools:$PATH"
+```
 
 Enabling debugging on the phone, over USB:
 
@@ -50,8 +59,8 @@ Enabling debugging on the phone, over USB:
    Charging-only mode hides the device from `adb`.
 4. Tap **Allow** on the USB debugging prompt.
 
-Confirm with `adb devices` — the phone should be listed as `device`, not
-`unauthorized`.
+Confirm with `./scripts/run-on-device.sh --devices` — the phone should be listed as
+`device`, not `unauthorized`.
 
 Or plain Gradle, if the phone is already connected:
 
