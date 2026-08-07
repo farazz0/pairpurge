@@ -17,7 +17,33 @@ sealed interface PairedDevicesUiState {
 
     data object Empty : PairedDevicesUiState
 
-    data class Devices(val devices: List<PairedDevice>) : PairedDevicesUiState
+    /**
+     * The device list, plus which rows the user has ticked.
+     *
+     * Selection is held as addresses rather than [PairedDevice] values because the
+     * address is the stable identity — a device that renames itself between refreshes
+     * is still the same device.
+     */
+    data class Devices(
+        val devices: List<PairedDevice>,
+        val selectedAddresses: Set<String> = emptySet(),
+    ) : PairedDevicesUiState {
+
+        /** False for an empty list: "all of nothing" would tick the select-all box. */
+        val allSelected: Boolean
+            get() = devices.isNotEmpty() && selectedAddresses.size == devices.size
+
+        /** Ticks or unticks one row. Unknown addresses are ignored, never added. */
+        fun toggled(address: String): Devices = when {
+            devices.none { it.address == address } -> this
+            address in selectedAddresses -> copy(selectedAddresses = selectedAddresses - address)
+            else -> copy(selectedAddresses = selectedAddresses + address)
+        }
+
+        fun withAllSelected(selected: Boolean): Devices = copy(
+            selectedAddresses = if (selected) devices.mapTo(mutableSetOf()) { it.address } else emptySet(),
+        )
+    }
 }
 
 /**

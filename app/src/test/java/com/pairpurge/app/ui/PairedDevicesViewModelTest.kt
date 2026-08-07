@@ -88,4 +88,65 @@ class PairedDevicesViewModelTest {
 
         assertEquals(PairedDevicesUiState.Empty, viewModel.uiState.value)
     }
+
+    // Selection
+
+    private val speaker = PairedDevice(name = "Speaker", address = "AA:BB:CC:DD:EE:02")
+
+    private fun listing(vararg devices: PairedDevice): PairedDevicesViewModel =
+        PairedDevicesViewModel(FakeBluetoothDeviceSource(devices = devices.toList()))
+            .apply { refresh(hasPermission = true) }
+
+    private val PairedDevicesViewModel.selection: Set<String>
+        get() = (uiState.value as PairedDevicesUiState.Devices).selectedAddresses
+
+    @Test
+    fun `toggling selection publishes a new state`() {
+        val viewModel = listing(headphones, speaker)
+
+        viewModel.toggleSelection(headphones.address)
+
+        assertEquals(setOf(headphones.address), viewModel.selection)
+    }
+
+    @Test
+    fun `selecting all publishes every address`() {
+        val viewModel = listing(headphones, speaker)
+
+        viewModel.setAllSelected(true)
+
+        assertEquals(setOf(headphones.address, speaker.address), viewModel.selection)
+    }
+
+    @Test
+    fun `refresh clears the selection`() {
+        val viewModel = listing(headphones, speaker)
+        viewModel.setAllSelected(true)
+
+        viewModel.refresh(hasPermission = true)
+
+        assertEquals(emptySet<String>(), viewModel.selection)
+    }
+
+    @Test
+    fun `toggling selection before a list is shown is ignored`() {
+        val viewModel = PairedDevicesViewModel(FakeBluetoothDeviceSource())
+
+        viewModel.toggleSelection(headphones.address)
+
+        assertEquals(PairedDevicesUiState.Loading, viewModel.uiState.value)
+    }
+
+    @Test
+    fun `selecting all with no list shown is ignored`() {
+        val viewModel = PairedDevicesViewModel(FakeBluetoothDeviceSource())
+        viewModel.refresh(hasPermission = false)
+
+        viewModel.setAllSelected(true)
+
+        assertEquals(
+            PairedDevicesUiState.NeedsPermission(permanentlyDenied = false),
+            viewModel.uiState.value,
+        )
+    }
 }

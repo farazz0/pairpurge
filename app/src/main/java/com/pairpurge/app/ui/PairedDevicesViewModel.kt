@@ -49,6 +49,25 @@ class PairedDevicesViewModel(
         )
     }
 
+    /** Ticks or unticks one row. */
+    fun toggleSelection(address: String) = updateDevices { it.toggled(address) }
+
+    /** Ticks or unticks every row at once. */
+    fun setAllSelected(selected: Boolean) = updateDevices { it.withAllSelected(selected) }
+
+    /**
+     * Applies a selection change, but only while a list is on screen.
+     *
+     * Selection is meaningless in every other state, and a stray tap arriving during a
+     * state change must not resurrect a stale list.
+     */
+    private inline fun updateDevices(
+        transform: (PairedDevicesUiState.Devices) -> PairedDevicesUiState.Devices,
+    ) {
+        val current = _uiState.value
+        if (current is PairedDevicesUiState.Devices) _uiState.value = transform(current)
+    }
+
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {

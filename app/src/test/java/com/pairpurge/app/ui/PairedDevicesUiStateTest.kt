@@ -3,6 +3,8 @@ package com.pairpurge.app.ui
 import com.pairpurge.app.bluetooth.BluetoothStatus
 import com.pairpurge.app.bluetooth.PairedDevice
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PairedDevicesUiStateTest {
@@ -102,5 +104,86 @@ class PairedDevicesUiStateTest {
         val state = derive(devices = listOf(second, first)) as PairedDevicesUiState.Devices
 
         assertEquals(listOf(first, second), state.devices)
+    }
+
+    // Selection
+
+    private fun listed(vararg devices: PairedDevice) =
+        derive(devices = devices.toList()) as PairedDevicesUiState.Devices
+
+    @Test
+    fun `a freshly derived list has nothing selected`() {
+        val state = listed(headphones, car)
+
+        assertEquals(emptySet<String>(), state.selectedAddresses)
+        assertFalse(state.allSelected)
+    }
+
+    @Test
+    fun `toggling a device selects it`() {
+        val state = listed(headphones, car).toggled(headphones.address)
+
+        assertEquals(setOf(headphones.address), state.selectedAddresses)
+    }
+
+    @Test
+    fun `toggling a selected device deselects it`() {
+        val state = listed(headphones, car)
+            .toggled(headphones.address)
+            .toggled(headphones.address)
+
+        assertEquals(emptySet<String>(), state.selectedAddresses)
+    }
+
+    @Test
+    fun `toggling leaves other selections alone`() {
+        val state = listed(headphones, car, unnamed)
+            .toggled(headphones.address)
+            .toggled(car.address)
+            .toggled(headphones.address)
+
+        assertEquals(setOf(car.address), state.selectedAddresses)
+    }
+
+    @Test
+    fun `toggling an address that is not listed changes nothing`() {
+        val state = listed(headphones).toggled("AA:BB:CC:DD:EE:FF")
+
+        assertEquals(emptySet<String>(), state.selectedAddresses)
+    }
+
+    @Test
+    fun `selecting all selects every listed device`() {
+        val state = listed(headphones, car, unnamed).withAllSelected(true)
+
+        assertEquals(
+            setOf(headphones.address, car.address, unnamed.address),
+            state.selectedAddresses,
+        )
+        assertTrue(state.allSelected)
+    }
+
+    @Test
+    fun `deselecting all clears the selection`() {
+        val state = listed(headphones, car).withAllSelected(true).withAllSelected(false)
+
+        assertEquals(emptySet<String>(), state.selectedAddresses)
+        assertFalse(state.allSelected)
+    }
+
+    @Test
+    fun `all selected is false while only some are selected`() {
+        val state = listed(headphones, car).toggled(headphones.address)
+
+        assertFalse(state.allSelected)
+    }
+
+    @Test
+    fun `toggling the last unselected device makes all selected true`() {
+        val state = listed(headphones, car)
+            .toggled(headphones.address)
+            .toggled(car.address)
+
+        assertTrue(state.allSelected)
     }
 }

@@ -24,4 +24,6 @@
         <item quantity="one">%d paired device</item>
         <item quantity="other">%d paired devices</item>
     </plurals>
+
+    <string name="selected_count">%1$d of %2$d selected</string>
 </resources>
