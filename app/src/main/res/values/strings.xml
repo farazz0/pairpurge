@@ -3,6 +3,12 @@
     <string name="app_name">PairPurge</string>
 
     <string name="action_refresh">Refresh</string>
+    <string name="action_unpair">Unpair</string>
+    <string name="action_open_menu">Open menu</string>
+    <string name="action_unpair_selected">Unpair selected devices</string>
+    <string name="action_whitelist_selected">Add selected devices to whitelist</string>
+    <string name="action_remove_from_whitelist">Remove</string>
+    <string name="unpair_failed">Couldn\'t unpair this device</string>
     <string name="action_grant">Grant permission</string>
     <string name="action_open_app_settings">Open app settings</string>
     <string name="action_open_bluetooth_settings">Open Bluetooth settings</string>
@@ -20,10 +26,25 @@
     <string name="empty_headline">No paired devices</string>
     <string name="empty_body">Devices you pair in Bluetooth settings will appear here. Tap Refresh after pairing.</string>
 
+    <string name="drawer_paired_devices">Paired devices</string>
+    <string name="drawer_whitelist">Whitelist</string>
+    <string name="whitelist_title">Whitelist</string>
+
+    <string name="all_whitelisted_headline">All devices whitelisted</string>
+    <string name="all_whitelisted_body">Every paired device is on the whitelist. Open the menu to view it.</string>
+
+    <string name="whitelist_empty_headline">No whitelisted devices</string>
+    <string name="whitelist_empty_body">Select devices on the paired list and tap the star to protect them here.</string>
+
     <plurals name="paired_device_count">
         <item quantity="one">%d paired device</item>
         <item quantity="other">%d paired devices</item>
     </plurals>
 
     <string name="selected_count">%1$d of %2$d selected</string>
+
+    <plurals name="unpair_selected_failed">
+        <item quantity="one">Couldn\'t unpair %d device</item>
+        <item quantity="other">Couldn\'t unpair %d devices</item>
+    </plurals>
 </resources>

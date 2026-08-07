@@ -18,7 +18,8 @@ class PairedDevicesUiStateTest {
         permanentlyDenied: Boolean = false,
         status: BluetoothStatus = BluetoothStatus.READY,
         devices: List<PairedDevice> = emptyList(),
-    ) = derivePairedDevicesState(hasPermission, permanentlyDenied, status, devices)
+        whitelistedAddresses: Set<String> = emptySet(),
+    ) = derivePairedDevicesState(hasPermission, permanentlyDenied, status, devices, whitelistedAddresses)
 
     @Test
     fun `missing permission asks for permission`() {
@@ -185,5 +186,80 @@ class PairedDevicesUiStateTest {
             .toggled(car.address)
 
         assertTrue(state.allSelected)
+    }
+
+    // Whitelist
+
+    @Test
+    fun `whitelisted devices are split out of the main list`() {
+        val state = derive(
+            devices = listOf(headphones, car),
+            whitelistedAddresses = setOf(car.address),
+        ) as PairedDevicesUiState.Devices
+
+        assertEquals(listOf(headphones), state.mainDevices)
+        assertEquals(listOf(car), state.whitelistedDevices)
+    }
+
+    @Test
+    fun `whitelisting every device keeps the list state`() {
+        val state = derive(
+            devices = listOf(headphones),
+            whitelistedAddresses = setOf(headphones.address),
+        ) as PairedDevicesUiState.Devices
+
+        assertEquals(emptyList<PairedDevice>(), state.mainDevices)
+        assertEquals(listOf(headphones), state.whitelistedDevices)
+    }
+
+    @Test
+    fun `whitelist entries for devices that are no longer bonded are not listed`() {
+        val state = derive(
+            devices = listOf(headphones),
+            whitelistedAddresses = setOf("AA:BB:CC:DD:EE:FF"),
+        ) as PairedDevicesUiState.Devices
+
+        assertEquals(listOf(headphones), state.mainDevices)
+        assertEquals(emptyList<PairedDevice>(), state.whitelistedDevices)
+    }
+
+    @Test
+    fun `selecting all selects only main-list devices`() {
+        val state = derive(
+            devices = listOf(headphones, car),
+            whitelistedAddresses = setOf(car.address),
+        ) as PairedDevicesUiState.Devices
+
+        assertEquals(setOf(headphones.address), state.withAllSelected(true).selectedAddresses)
+    }
+
+    @Test
+    fun `toggling a whitelisted device changes nothing`() {
+        val state = derive(
+            devices = listOf(headphones, car),
+            whitelistedAddresses = setOf(car.address),
+        ) as PairedDevicesUiState.Devices
+
+        assertEquals(emptySet<String>(), state.toggled(car.address).selectedAddresses)
+    }
+
+    @Test
+    fun `all selected ignores whitelisted devices`() {
+        val state = derive(
+            devices = listOf(headphones, car),
+            whitelistedAddresses = setOf(car.address),
+        ) as PairedDevicesUiState.Devices
+
+        assertTrue(state.toggled(headphones.address).allSelected)
+    }
+
+    @Test
+    fun `all selected is false when every device is whitelisted`() {
+        val state = derive(
+            devices = listOf(headphones),
+            whitelistedAddresses = setOf(headphones.address),
+        ) as PairedDevicesUiState.Devices
+
+        assertFalse(state.allSelected)
     }
 }

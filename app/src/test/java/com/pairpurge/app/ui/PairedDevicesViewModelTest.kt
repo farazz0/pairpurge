@@ -3,18 +3,24 @@ package com.pairpurge.app.ui
 import com.pairpurge.app.bluetooth.BluetoothDeviceSource
 import com.pairpurge.app.bluetooth.BluetoothStatus
 import com.pairpurge.app.bluetooth.PairedDevice
+import com.pairpurge.app.whitelist.WhitelistStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 private class FakeBluetoothDeviceSource(
     var status: BluetoothStatus = BluetoothStatus.READY,
     var devices: List<PairedDevice> = emptyList(),
     var throwOnRead: Boolean = false,
+    var unpairResult: Boolean = true,
+    var failUnpairFor: Set<String> = emptySet(),
 ) : BluetoothDeviceSource {
 
     var wasRead: Boolean = false
         private set
+
+    val unpairAttempts = mutableListOf<String>()
 
     override fun status(): BluetoothStatus = status
 
@@ -23,7 +29,34 @@ private class FakeBluetoothDeviceSource(
         if (throwOnRead) throw SecurityException("denied")
         return devices
     }
+
+    override fun unpair(address: String): Boolean {
+        unpairAttempts += address
+        return unpairResult && address !in failUnpairFor
+    }
 }
+
+private class InMemoryWhitelistStore(
+    initial: Set<String> = emptySet(),
+) : WhitelistStore {
+
+    private val stored = initial.toMutableSet()
+
+    override fun addresses(): Set<String> = stored.toSet()
+
+    override fun add(addresses: Collection<String>) {
+        stored += addresses
+    }
+
+    override fun remove(address: String) {
+        stored -= address
+    }
+}
+
+private fun viewModel(
+    source: BluetoothDeviceSource = FakeBluetoothDeviceSource(),
+    whitelist: WhitelistStore = InMemoryWhitelistStore(),
+) = PairedDevicesViewModel(source, whitelist)
 
 class PairedDevicesViewModelTest {
 
@@ -31,7 +64,7 @@ class PairedDevicesViewModelTest {
 
     @Test
     fun `starts in loading`() {
-        val viewModel = PairedDevicesViewModel(FakeBluetoothDeviceSource())
+        val viewModel = viewModel()
 
         assertEquals(PairedDevicesUiState.Loading, viewModel.uiState.value)
     }
@@ -39,7 +72,7 @@ class PairedDevicesViewModelTest {
     @Test
     fun `refresh publishes bonded devices`() {
         val source = FakeBluetoothDeviceSource(devices = listOf(headphones))
-        val viewModel = PairedDevicesViewModel(source)
+        val viewModel = viewModel(source)
 
         viewModel.refresh(hasPermission = true)
 
@@ -48,7 +81,7 @@ class PairedDevicesViewModelTest {
 
     @Test
     fun `refresh publishes empty when there are no bonded devices`() {
-        val viewModel = PairedDevicesViewModel(FakeBluetoothDeviceSource())
+        val viewModel = viewModel()
 
         viewModel.refresh(hasPermission = true)
 
@@ -58,7 +91,7 @@ class PairedDevicesViewModelTest {
     @Test
     fun `refresh reports a disabled adapter`() {
         val source = FakeBluetoothDeviceSource(status = BluetoothStatus.DISABLED)
-        val viewModel = PairedDevicesViewModel(source)
+        val viewModel = viewModel(source)
 
         viewModel.refresh(hasPermission = true)
 
@@ -68,7 +101,7 @@ class PairedDevicesViewModelTest {
     @Test
     fun `refresh without permission does not touch the source`() {
         val source = FakeBluetoothDeviceSource(devices = listOf(headphones))
-        val viewModel = PairedDevicesViewModel(source)
+        val viewModel = viewModel(source)
 
         viewModel.refresh(hasPermission = false, permanentlyDenied = true)
 
@@ -82,7 +115,7 @@ class PairedDevicesViewModelTest {
     @Test
     fun `a source that throws does not crash the refresh`() {
         val source = FakeBluetoothDeviceSource(throwOnRead = true)
-        val viewModel = PairedDevicesViewModel(source)
+        val viewModel = viewModel(source)
 
         viewModel.refresh(hasPermission = true)
 
@@ -94,7 +127,7 @@ class PairedDevicesViewModelTest {
     private val speaker = PairedDevice(name = "Speaker", address = "AA:BB:CC:DD:EE:02")
 
     private fun listing(vararg devices: PairedDevice): PairedDevicesViewModel =
-        PairedDevicesViewModel(FakeBluetoothDeviceSource(devices = devices.toList()))
+        viewModel(FakeBluetoothDeviceSource(devices = devices.toList()))
             .apply { refresh(hasPermission = true) }
 
     private val PairedDevicesViewModel.selection: Set<String>
@@ -130,7 +163,7 @@ class PairedDevicesViewModelTest {
 
     @Test
     fun `toggling selection before a list is shown is ignored`() {
-        val viewModel = PairedDevicesViewModel(FakeBluetoothDeviceSource())
+        val viewModel = viewModel()
 
         viewModel.toggleSelection(headphones.address)
 
@@ -139,7 +172,7 @@ class PairedDevicesViewModelTest {
 
     @Test
     fun `selecting all with no list shown is ignored`() {
-        val viewModel = PairedDevicesViewModel(FakeBluetoothDeviceSource())
+        val viewModel = viewModel()
         viewModel.refresh(hasPermission = false)
 
         viewModel.setAllSelected(true)
@@ -148,5 +181,200 @@ class PairedDevicesViewModelTest {
             PairedDevicesUiState.NeedsPermission(permanentlyDenied = false),
             viewModel.uiState.value,
         )
+    }
+
+    // Unpairing
+
+    @Test
+    fun `accepted unpair removes the device and its selection`() {
+        val source = FakeBluetoothDeviceSource(devices = listOf(headphones, speaker))
+        val viewModel = viewModel(source)
+        viewModel.refresh(hasPermission = true)
+        viewModel.toggleSelection(headphones.address)
+
+        assertTrue(viewModel.unpair(headphones.address))
+
+        assertEquals(listOf(headphones.address), source.unpairAttempts)
+        assertEquals(
+            PairedDevicesUiState.Devices(devices = listOf(speaker)),
+            viewModel.uiState.value,
+        )
+    }
+
+    @Test
+    fun `accepted unpair of the last device publishes empty`() {
+        val source = FakeBluetoothDeviceSource(devices = listOf(headphones))
+        val viewModel = viewModel(source)
+        viewModel.refresh(hasPermission = true)
+
+        assertTrue(viewModel.unpair(headphones.address))
+
+        assertEquals(PairedDevicesUiState.Empty, viewModel.uiState.value)
+    }
+
+    @Test
+    fun `rejected unpair leaves the list unchanged`() {
+        val source = FakeBluetoothDeviceSource(
+            devices = listOf(headphones),
+            unpairResult = false,
+        )
+        val viewModel = viewModel(source)
+        viewModel.refresh(hasPermission = true)
+
+        assertFalse(viewModel.unpair(headphones.address))
+
+        assertEquals(
+            PairedDevicesUiState.Devices(devices = listOf(headphones)),
+            viewModel.uiState.value,
+        )
+    }
+
+    @Test
+    fun `unpairing an unknown device does not call the source`() {
+        val source = FakeBluetoothDeviceSource(devices = listOf(headphones))
+        val viewModel = viewModel(source)
+        viewModel.refresh(hasPermission = true)
+
+        assertFalse(viewModel.unpair(speaker.address))
+
+        assertEquals(emptyList<String>(), source.unpairAttempts)
+    }
+
+    // Whitelist
+
+    private val PairedDevicesViewModel.listState: PairedDevicesUiState.Devices
+        get() = uiState.value as PairedDevicesUiState.Devices
+
+    @Test
+    fun `refresh loads the persisted whitelist`() {
+        val store = InMemoryWhitelistStore(initial = setOf(speaker.address))
+        val viewModel = viewModel(
+            FakeBluetoothDeviceSource(devices = listOf(headphones, speaker)),
+            store,
+        )
+
+        viewModel.refresh(hasPermission = true)
+
+        assertEquals(listOf(headphones), viewModel.listState.mainDevices)
+        assertEquals(listOf(speaker), viewModel.listState.whitelistedDevices)
+    }
+
+    @Test
+    fun `whitelisting the selection moves the devices and persists them`() {
+        val store = InMemoryWhitelistStore()
+        val viewModel = viewModel(
+            FakeBluetoothDeviceSource(devices = listOf(headphones, speaker)),
+            store,
+        )
+        viewModel.refresh(hasPermission = true)
+        viewModel.toggleSelection(headphones.address)
+
+        viewModel.whitelistSelected()
+
+        assertEquals(listOf(speaker), viewModel.listState.mainDevices)
+        assertEquals(listOf(headphones), viewModel.listState.whitelistedDevices)
+        assertEquals(setOf(headphones.address), store.addresses())
+    }
+
+    @Test
+    fun `whitelisting the selection clears the selection`() {
+        val viewModel = listing(headphones, speaker)
+        viewModel.setAllSelected(true)
+
+        viewModel.whitelistSelected()
+
+        assertEquals(emptySet<String>(), viewModel.selection)
+    }
+
+    @Test
+    fun `whitelisting with nothing selected changes nothing`() {
+        val store = InMemoryWhitelistStore()
+        val viewModel = viewModel(
+            FakeBluetoothDeviceSource(devices = listOf(headphones)),
+            store,
+        )
+        viewModel.refresh(hasPermission = true)
+
+        viewModel.whitelistSelected()
+
+        assertEquals(listOf(headphones), viewModel.listState.mainDevices)
+        assertEquals(emptySet<String>(), store.addresses())
+    }
+
+    @Test
+    fun `removing from the whitelist returns the device and persists the removal`() {
+        val store = InMemoryWhitelistStore(initial = setOf(headphones.address))
+        val viewModel = viewModel(
+            FakeBluetoothDeviceSource(devices = listOf(headphones)),
+            store,
+        )
+        viewModel.refresh(hasPermission = true)
+
+        viewModel.removeFromWhitelist(headphones.address)
+
+        assertEquals(listOf(headphones), viewModel.listState.mainDevices)
+        assertEquals(emptyList<PairedDevice>(), viewModel.listState.whitelistedDevices)
+        assertEquals(emptySet<String>(), store.addresses())
+    }
+
+    // Bulk unpairing
+
+    @Test
+    fun `unpair selected unpairs every selected device`() {
+        val source = FakeBluetoothDeviceSource(devices = listOf(headphones, speaker))
+        val viewModel = viewModel(source)
+        viewModel.refresh(hasPermission = true)
+        viewModel.setAllSelected(true)
+
+        val failures = viewModel.unpairSelected()
+
+        assertEquals(0, failures)
+        assertEquals(
+            setOf(headphones.address, speaker.address),
+            source.unpairAttempts.toSet(),
+        )
+        assertEquals(PairedDevicesUiState.Empty, viewModel.uiState.value)
+    }
+
+    @Test
+    fun `unpair selected keeps devices whose unpair was rejected`() {
+        val source = FakeBluetoothDeviceSource(
+            devices = listOf(headphones, speaker),
+            failUnpairFor = setOf(speaker.address),
+        )
+        val viewModel = viewModel(source)
+        viewModel.refresh(hasPermission = true)
+        viewModel.setAllSelected(true)
+
+        val failures = viewModel.unpairSelected()
+
+        assertEquals(1, failures)
+        assertEquals(listOf(speaker), viewModel.listState.mainDevices)
+        assertEquals(setOf(speaker.address), viewModel.selection)
+    }
+
+    @Test
+    fun `unpair selected with nothing selected does not call the source`() {
+        val source = FakeBluetoothDeviceSource(devices = listOf(headphones))
+        val viewModel = viewModel(source)
+        viewModel.refresh(hasPermission = true)
+
+        val failures = viewModel.unpairSelected()
+
+        assertEquals(0, failures)
+        assertEquals(emptyList<String>(), source.unpairAttempts)
+    }
+
+    @Test
+    fun `unpairing every main device keeps whitelisted devices listed`() {
+        val source = FakeBluetoothDeviceSource(devices = listOf(headphones, speaker))
+        val viewModel = viewModel(source, InMemoryWhitelistStore(initial = setOf(speaker.address)))
+        viewModel.refresh(hasPermission = true)
+        viewModel.setAllSelected(true)
+
+        viewModel.unpairSelected()
+
+        assertEquals(emptyList<PairedDevice>(), viewModel.listState.mainDevices)
+        assertEquals(listOf(speaker), viewModel.listState.whitelistedDevices)
     }
 }

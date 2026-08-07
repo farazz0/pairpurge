@@ -7,6 +7,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.pairpurge.app.bluetooth.BluetoothDeviceSource
 import com.pairpurge.app.bluetooth.SystemBluetoothDeviceSource
+import com.pairpurge.app.whitelist.SharedPreferencesWhitelistStore
+import com.pairpurge.app.whitelist.WhitelistStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 class PairedDevicesViewModel(
     private val source: BluetoothDeviceSource,
+    private val whitelist: WhitelistStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<PairedDevicesUiState>(PairedDevicesUiState.Loading)
@@ -46,6 +49,7 @@ class PairedDevicesViewModel(
             permanentlyDenied = false,
             status = status,
             devices = devices,
+            whitelistedAddresses = whitelist.addresses(),
         )
     }
 
@@ -54,6 +58,79 @@ class PairedDevicesViewModel(
 
     /** Ticks or unticks every row at once. */
     fun setAllSelected(selected: Boolean) = updateDevices { it.withAllSelected(selected) }
+
+    /**
+     * Requests an unpair and removes the device from the visible list when Android
+     * accepts it. A manual refresh restores the row if the asynchronous removal later
+     * fails at the platform level.
+     */
+    fun unpair(address: String): Boolean {
+        val current = _uiState.value as? PairedDevicesUiState.Devices ?: return false
+        if (current.devices.none { it.address == address }) return false
+
+        val accepted = try {
+            source.unpair(address)
+        } catch (_: SecurityException) {
+            false
+        }
+        if (!accepted) return false
+
+        val remainingDevices = current.devices.filterNot { it.address == address }
+        _uiState.value = if (remainingDevices.isEmpty()) {
+            PairedDevicesUiState.Empty
+        } else {
+            current.copy(
+                devices = remainingDevices,
+                selectedAddresses = current.selectedAddresses - address,
+            )
+        }
+        return true
+    }
+
+    /**
+     * Unpairs every selected device and returns how many requests Android rejected.
+     * Rejected devices stay listed and stay selected so the user can retry them.
+     */
+    fun unpairSelected(): Int {
+        val current = _uiState.value as? PairedDevicesUiState.Devices ?: return 0
+        if (current.selectedAddresses.isEmpty()) return 0
+
+        val failed = current.selectedAddresses.filterNotTo(mutableSetOf()) { address ->
+            try {
+                source.unpair(address)
+            } catch (_: SecurityException) {
+                false
+            }
+        }
+
+        val remainingDevices = current.devices.filter {
+            it.address !in current.selectedAddresses || it.address in failed
+        }
+        _uiState.value = if (remainingDevices.isEmpty()) {
+            PairedDevicesUiState.Empty
+        } else {
+            current.copy(devices = remainingDevices, selectedAddresses = failed)
+        }
+        return failed.size
+    }
+
+    /** Moves the selected devices to the whitelist and persists them. */
+    fun whitelistSelected() {
+        val current = _uiState.value as? PairedDevicesUiState.Devices ?: return
+        if (current.selectedAddresses.isEmpty()) return
+
+        whitelist.add(current.selectedAddresses)
+        _uiState.value = current.copy(
+            whitelistedAddresses = current.whitelistedAddresses + current.selectedAddresses,
+            selectedAddresses = emptySet(),
+        )
+    }
+
+    /** Returns one device from the whitelist to the main list and persists the removal. */
+    fun removeFromWhitelist(address: String) {
+        whitelist.remove(address)
+        updateDevices { it.copy(whitelistedAddresses = it.whitelistedAddresses - address) }
+    }
 
     /**
      * Applies a selection change, but only while a list is on screen.
@@ -72,7 +149,10 @@ class PairedDevicesViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val application = checkNotNull(this[APPLICATION_KEY])
-                PairedDevicesViewModel(SystemBluetoothDeviceSource(application))
+                PairedDevicesViewModel(
+                    source = SystemBluetoothDeviceSource(application),
+                    whitelist = SharedPreferencesWhitelistStore(application),
+                )
             }
         }
     }

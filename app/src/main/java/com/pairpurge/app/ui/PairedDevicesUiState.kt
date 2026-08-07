@@ -18,30 +18,43 @@ sealed interface PairedDevicesUiState {
     data object Empty : PairedDevicesUiState
 
     /**
-     * The device list, plus which rows the user has ticked.
+     * The device list, plus which rows the user has ticked and which addresses are
+     * whitelisted.
      *
-     * Selection is held as addresses rather than [PairedDevice] values because the
-     * address is the stable identity — a device that renames itself between refreshes
-     * is still the same device.
+     * Selection and whitelist are held as addresses rather than [PairedDevice] values
+     * because the address is the stable identity — a device that renames itself between
+     * refreshes is still the same device.
      */
     data class Devices(
         val devices: List<PairedDevice>,
         val selectedAddresses: Set<String> = emptySet(),
+        val whitelistedAddresses: Set<String> = emptySet(),
     ) : PairedDevicesUiState {
+
+        /** What the first page shows: everything the user has not whitelisted. */
+        val mainDevices: List<PairedDevice>
+            get() = devices.filterNot { it.address in whitelistedAddresses }
+
+        /** What the whitelist page shows. Stored addresses no longer bonded stay hidden. */
+        val whitelistedDevices: List<PairedDevice>
+            get() = devices.filter { it.address in whitelistedAddresses }
 
         /** False for an empty list: "all of nothing" would tick the select-all box. */
         val allSelected: Boolean
-            get() = devices.isNotEmpty() && selectedAddresses.size == devices.size
+            get() = mainDevices.isNotEmpty() && selectedAddresses.size == mainDevices.size
 
-        /** Ticks or unticks one row. Unknown addresses are ignored, never added. */
+        /**
+         * Ticks or unticks one row. Unknown and whitelisted addresses are ignored:
+         * only the main list has checkboxes.
+         */
         fun toggled(address: String): Devices = when {
-            devices.none { it.address == address } -> this
+            mainDevices.none { it.address == address } -> this
             address in selectedAddresses -> copy(selectedAddresses = selectedAddresses - address)
             else -> copy(selectedAddresses = selectedAddresses + address)
         }
 
         fun withAllSelected(selected: Boolean): Devices = copy(
-            selectedAddresses = if (selected) devices.mapTo(mutableSetOf()) { it.address } else emptySet(),
+            selectedAddresses = if (selected) mainDevices.mapTo(mutableSetOf()) { it.address } else emptySet(),
         )
     }
 }
@@ -57,12 +70,16 @@ fun derivePairedDevicesState(
     permanentlyDenied: Boolean,
     status: BluetoothStatus,
     devices: List<PairedDevice>,
+    whitelistedAddresses: Set<String> = emptySet(),
 ): PairedDevicesUiState = when {
     !hasPermission -> PairedDevicesUiState.NeedsPermission(permanentlyDenied)
     status == BluetoothStatus.UNSUPPORTED -> PairedDevicesUiState.BluetoothUnsupported
     status == BluetoothStatus.DISABLED -> PairedDevicesUiState.BluetoothDisabled
     devices.isEmpty() -> PairedDevicesUiState.Empty
-    else -> PairedDevicesUiState.Devices(devices.sortedForDisplay())
+    else -> PairedDevicesUiState.Devices(
+        devices = devices.sortedForDisplay(),
+        whitelistedAddresses = whitelistedAddresses,
+    )
 }
 
 /**

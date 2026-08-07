@@ -2,9 +2,20 @@
 
 Android app for bulk-managing paired Bluetooth devices.
 
-**Milestone 1 (current): read-only.** Lists every device currently bonded with the
-phone, with its name, MAC address, and the total count. No unpairing yet — this
-milestone exists to prove enumeration is complete and correct on real hardware.
+Lists every device currently bonded with the phone, with its name, MAC address, and
+the total count. Each row also has an **Unpair** action for removing that bond.
+
+Rows can be selected with checkboxes (or all at once via the header). While a
+selection exists, the top bar shows two bulk actions: a trash icon that unpairs the
+selected devices and a star icon that moves them to the **whitelist**. Whitelisted
+devices are hidden from the main list and shown on their own page, reached through
+the hamburger menu; each has a **Remove** action that returns it to the main list.
+The whitelist is persisted (keyed by MAC address), so it survives restarts and even
+re-pairing the same device.
+
+Android does not provide bond removal in its public SDK, so direct unpairing uses the
+hidden `BluetoothDevice.removeBond()` method. PairPurge handles devices that block
+that method without crashing, but support can vary by Android release and phone maker.
 
 ## Requirements
 
@@ -94,14 +105,14 @@ matches it.
 ## Architecture
 
 ```
-PairedDevicesScreen      Compose: permission launcher, renders state
+PairedDevicesScreen      Compose: permission launcher, drawer nav, renders state
         │  refresh(hasPermission, permanentlyDenied)
         ▼
 PairedDevicesViewModel   StateFlow<PairedDevicesUiState>
-        │  status() / bondedDevices()
-        ▼
-BluetoothDeviceSource    interface
-        └── SystemBluetoothDeviceSource   BluetoothManager / BluetoothAdapter
+        │  status() / bondedDevices()          │  addresses() / add() / remove()
+        ▼                                      ▼
+BluetoothDeviceSource    interface          WhitelistStore    interface
+        └── SystemBluetoothDeviceSource             └── SharedPreferencesWhitelistStore
 ```
 
 All screen-selection logic lives in `derivePairedDevicesState`, a pure function, so

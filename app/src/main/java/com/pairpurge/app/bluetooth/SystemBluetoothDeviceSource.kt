@@ -28,4 +28,22 @@ class SystemBluetoothDeviceSource(context: Context) : BluetoothDeviceSource {
     } catch (_: SecurityException) {
         emptyList()
     }
+
+    /**
+     * Android does not expose bond removal in its public SDK. The hidden method is
+     * used deliberately here so PairPurge can perform its core action without sending
+     * the user to Settings. Failure is expected on devices that restrict this API.
+     */
+    @SuppressLint("MissingPermission", "PrivateApi")
+    override fun unpair(address: String): Boolean = try {
+        val device = adapter?.getRemoteDevice(address) ?: return false
+        val removeBond = device.javaClass.getMethod("removeBond")
+        removeBond.invoke(device) == true
+    } catch (_: ReflectiveOperationException) {
+        false
+    } catch (_: SecurityException) {
+        false
+    } catch (_: IllegalArgumentException) {
+        false
+    }
 }
