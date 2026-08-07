@@ -10,6 +10,9 @@
 #   ./scripts/run-on-device.sh --pair                how to connect over Wi-Fi
 #   ./scripts/run-on-device.sh --pair IP:PORT CODE   pair over Wi-Fi
 #   ./scripts/run-on-device.sh --connect IP:PORT     connect over Wi-Fi
+#   ./scripts/run-on-device.sh --discover IP         find the phone's current
+#                                                    wireless-debugging port and
+#                                                    connect to it
 #
 # adb does not need to be on PATH; this script finds it inside the SDK.
 #
@@ -55,6 +58,63 @@ while [[ $# -gt 0 ]]; do
         --connect)
             [[ -n "${2:-}" ]] || { echo "usage: $SELF --connect IP:PORT" >&2; exit 2; }
             exec "$ADB" connect "$2"
+            ;;
+        --discover)
+            # Android rotates the wireless-debugging port, so a port read a minute
+            # ago is often already dead. Scan the phone for whatever is listening
+            # now and try each candidate.
+            host="${2:-}"
+            [[ -n "$host" ]] || { echo "usage: $SELF --discover IP" >&2; exit 2; }
+            echo "Scanning $host for open ports (this takes a few seconds)..."
+            ports=$(python3 - "$host" <<'PY'
+import socket, sys
+from concurrent.futures import ThreadPoolExecutor
+
+host = sys.argv[1]
+
+def probe(port):
+    s = socket.socket()
+    s.settimeout(1.0)
+    try:
+        return port if s.connect_ex((host, port)) == 0 else None
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+# Android picks the wireless-debugging port from the ephemeral range.
+with ThreadPoolExecutor(max_workers=400) as pool:
+    found = [p for p in pool.map(probe, range(30000, 65536)) if p]
+
+print("\n".join(str(p) for p in found))
+PY
+)
+            if [[ -z "$ports" ]]; then
+                cat <<EOF
+Nothing listening on $host in the wireless-debugging port range.
+
+That usually means Wireless debugging is off, or the phone dropped off the
+network. On the phone, open Settings -> System -> Developer options ->
+Wireless debugging and leave that screen open, then rerun this command.
+
+Also confirm the phone is on the same Wi-Fi network as this Mac, and that the
+network is not a "guest" or client-isolated one — those block device-to-device
+traffic entirely.
+EOF
+                exit 1
+            fi
+            for port in $ports; do
+                echo "Trying $host:$port ..."
+                if "$ADB" connect "$host:$port" 2>&1 | grep -q "^connected\|already connected"; then
+                    echo "Connected to $host:$port"
+                    "$ADB" devices -l
+                    exit 0
+                fi
+            done
+            echo "Found open ports but none accepted an adb connection:" >&2
+            printf '  %s\n' $ports >&2
+            echo "If pairing was done a while ago, pair again with: $SELF --pair" >&2
+            exit 1
             ;;
         --pair)
             if [[ -n "${2:-}" && -n "${3:-}" ]]; then
