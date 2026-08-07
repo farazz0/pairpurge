@@ -23,7 +23,37 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 stub that is not a working JDK. Android Studio sets this itself, so builds started
 from the IDE need no extra setup.
 
-## Install on a device
+## Run on a physical device
+
+No special build configuration is needed — the debug APK is signed with the local
+debug keystore and installs on any Android 14+ phone. Only the connection has to be
+set up.
+
+```bash
+./scripts/run-on-device.sh
+```
+
+Builds, installs, and launches the app, and refuses clearly if no device is attached
+or the phone is older than API 34. Useful flags:
+
+| Flag | Effect |
+| --- | --- |
+| `--logs` | Tail logcat filtered to this app's process |
+| `--reset` | Wipe app data first, so the permission prompt reappears |
+| `--pair` | Print wireless-debugging pairing instructions |
+
+Enabling debugging on the phone, over USB:
+
+1. Settings → About phone → tap **Build number** seven times.
+2. Settings → System → Developer options → enable **USB debugging**.
+3. Plug in the cable, then pick **File transfer** on the phone's USB notification.
+   Charging-only mode hides the device from `adb`.
+4. Tap **Allow** on the USB debugging prompt.
+
+Confirm with `adb devices` — the phone should be listed as `device`, not
+`unauthorized`.
+
+Or plain Gradle, if the phone is already connected:
 
 ```bash
 ./gradlew installDebug
