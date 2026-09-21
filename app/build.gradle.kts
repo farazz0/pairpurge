@@ -1,7 +1,20 @@
+import java.util.Properties
+
 // AGP 9 compiles Kotlin itself; applying org.jetbrains.kotlin.android is an error now.
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+}
+
+// Upload-key credentials live in keystore.properties, which is gitignored along with
+// the keystore itself. When the file is absent — fresh clone, CI, another machine —
+// no release signing config is created and `assembleRelease` produces an unsigned
+// APK, so debug builds and unit tests still work with no setup.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use(::load)
+    }
 }
 
 android {
@@ -19,8 +32,22 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // Null when keystore.properties is missing; AGP then leaves the build
+            // unsigned rather than failing.
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

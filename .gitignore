@@ -7,3 +7,9 @@ local.properties
 captures/
 .externalNativeBuild
 .cxx
+
+# Release signing. Losing the keystore means losing the ability to update the app
+# on Play, so keep a backup somewhere safe — just never in this repo.
+keystore.properties
+*.jks
+*.keystore
