@@ -377,4 +377,38 @@ class PairedDevicesViewModelTest {
         assertEquals(emptyList<PairedDevice>(), viewModel.listState.mainDevices)
         assertEquals(listOf(speaker), viewModel.listState.whitelistedDevices)
     }
+
+    @Test
+    fun `clearing the selection drops every ticked row`() {
+        val viewModel = viewModel(FakeBluetoothDeviceSource(devices = listOf(headphones, speaker)))
+        viewModel.refresh(hasPermission = true)
+        viewModel.setAllSelected(true)
+
+        viewModel.clearSelection()
+
+        assertEquals(emptySet<String>(), viewModel.listState.selectedAddresses)
+    }
+
+    @Test
+    fun `the sort pill flips between the two orders`() {
+        val viewModel = viewModel(FakeBluetoothDeviceSource(devices = listOf(headphones)))
+        viewModel.refresh(hasPermission = true)
+
+        viewModel.toggleSortOrder()
+        assertEquals(DeviceSortOrder.Address, viewModel.listState.sortOrder)
+
+        viewModel.toggleSortOrder()
+        assertEquals(DeviceSortOrder.Name, viewModel.listState.sortOrder)
+    }
+
+    @Test
+    fun `the chosen sort order survives a refresh`() {
+        val viewModel = viewModel(FakeBluetoothDeviceSource(devices = listOf(headphones)))
+        viewModel.refresh(hasPermission = true)
+        viewModel.toggleSortOrder()
+
+        viewModel.refresh(hasPermission = true)
+
+        assertEquals(DeviceSortOrder.Address, viewModel.listState.sortOrder)
+    }
 }

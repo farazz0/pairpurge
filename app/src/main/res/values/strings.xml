@@ -2,39 +2,14 @@
 <resources>
     <string name="app_name">PairPurge</string>
 
+    <!-- Header and list -->
     <string name="action_refresh">Refresh</string>
+    <string name="action_clear_selection">Clear</string>
     <string name="action_unpair">Unpair</string>
-    <string name="action_open_menu">Open menu</string>
-    <string name="action_unpair_selected">Unpair selected devices</string>
-    <string name="action_whitelist_selected">Add selected devices to whitelist</string>
     <string name="action_remove_from_whitelist">Remove</string>
-    <string name="unpair_failed">Couldn\'t unpair this device</string>
-    <string name="action_grant">Grant permission</string>
-    <string name="action_open_app_settings">Open app settings</string>
-    <string name="action_open_bluetooth_settings">Open Bluetooth settings</string>
-
-    <string name="permission_headline">Bluetooth permission needed</string>
-    <string name="permission_body">PairPurge needs Bluetooth access to read the devices paired with this phone.</string>
-    <string name="permission_body_denied">Permission was denied. Enable it in app settings to see your paired devices.</string>
-
-    <string name="unsupported_headline">Bluetooth unavailable</string>
-    <string name="unsupported_body">This device doesn\'t have Bluetooth, so there are no paired devices to show.</string>
-
-    <string name="disabled_headline">Bluetooth is off</string>
-    <string name="disabled_body">Turn Bluetooth on to see your paired devices, then tap Refresh.</string>
-
-    <string name="empty_headline">No paired devices</string>
-    <string name="empty_body">Devices you pair in Bluetooth settings will appear here. Tap Refresh after pairing.</string>
-
-    <string name="drawer_paired_devices">Paired devices</string>
-    <string name="drawer_whitelist">Whitelist</string>
-    <string name="whitelist_title">Whitelist</string>
-
-    <string name="all_whitelisted_headline">All devices whitelisted</string>
-    <string name="all_whitelisted_body">Every paired device is on the whitelist. Open the menu to view it.</string>
-
-    <string name="whitelist_empty_headline">No whitelisted devices</string>
-    <string name="whitelist_empty_body">Select devices on the paired list and tap the star to protect them here.</string>
+    <string name="action_change_sort">Change sort order</string>
+    <string name="sort_by_name">Name</string>
+    <string name="sort_by_address">Address</string>
 
     <plurals name="paired_device_count">
         <item quantity="one">%d paired device</item>
@@ -42,9 +17,70 @@
     </plurals>
 
     <string name="selected_count">%1$d of %2$d selected</string>
+    <string name="action_select_all">Select all</string>
 
+    <!-- Bulk action bar -->
+    <string name="action_protect_count">Protect %d</string>
+    <string name="action_unpair_count">Unpair %d</string>
+
+    <!-- Unpair confirmation -->
+    <plurals name="unpair_dialog_title">
+        <item quantity="one">Unpair %d device?</item>
+        <item quantity="other">Unpair %d devices?</item>
+    </plurals>
+    <string name="unpair_dialog_body">They will be removed from this phone. Pairing them again means going back through Bluetooth settings.</string>
+    <string name="action_cancel">Cancel</string>
+
+    <string name="unpair_failed">Couldn\'t unpair this device</string>
     <plurals name="unpair_selected_failed">
         <item quantity="one">Couldn\'t unpair %d device</item>
         <item quantity="other">Couldn\'t unpair %d devices</item>
     </plurals>
+
+    <!-- Bottom navigation -->
+    <string name="nav_devices">Devices</string>
+    <string name="nav_protected">Protected</string>
+
+    <!-- Protected devices page -->
+    <string name="protected_title">Protected devices</string>
+    <string name="protected_blurb">These stay paired. Select all on the paired list skips them.</string>
+
+    <!-- State screens -->
+    <string name="action_grant">Grant permission</string>
+    <string name="action_open_app_settings">Open app settings</string>
+    <string name="action_open_bluetooth_settings">Open Bluetooth settings</string>
+    <string name="action_view_protected">View protected devices</string>
+
+    <string name="permission_headline">Bluetooth permission needed</string>
+    <string name="permission_body">PairPurge needs Bluetooth access to read the devices paired with this phone. It never scans for nearby devices.</string>
+
+    <string name="permission_denied_headline">Permission was denied</string>
+    <string name="permission_denied_body">Enable Bluetooth access in app settings to see your paired devices.</string>
+
+    <string name="unsupported_headline">Bluetooth unavailable</string>
+    <string name="unsupported_body">This phone doesn\'t have Bluetooth, so there are no paired devices to show.</string>
+
+    <string name="disabled_headline">Bluetooth is off</string>
+    <string name="disabled_body">Turn Bluetooth on to see your paired devices.</string>
+
+    <string name="empty_headline">Nothing paired</string>
+    <string name="empty_body">Devices you pair in Bluetooth settings show up here.</string>
+
+    <string name="all_whitelisted_headline">Every device is protected</string>
+    <plurals name="all_whitelisted_body">
+        <item quantity="one">Your only paired device is on the protected list, so there is nothing to clean up.</item>
+        <item quantity="other">All %d paired devices are on your protected list, so there is nothing to clean up.</item>
+    </plurals>
+
+    <string name="whitelist_empty_headline">Nothing protected yet</string>
+    <string name="whitelist_empty_body">Select devices on the paired list and tap Protect. They move here and stay out of bulk cleanups.</string>
+    <string name="settings_title">Settings</string>
+    <string name="auto_delete_title">Delete connections after N days</string>
+    <string name="auto_delete_description">Automatically unpair devices after this many days without a connection. Protected devices are always kept.</string>
+    <string name="auto_delete_days">Number of days</string>
+    <string name="auto_delete_range">Enter a whole number from 1 to 3650.</string>
+    <string name="auto_delete_timing">The timer resets after each connection. For devices with no recorded connection, it starts when PairPurge first sees them. Cleanup runs periodically while Bluetooth is on and permission is granted. Android may delay it. Saving a shorter period can make existing devices eligible.</string>
+    <string name="save_settings">Save settings</string>
+    <string name="settings_saved">Settings saved</string>
+    <string name="privacy_policy">Privacy policy</string>
 </resources>

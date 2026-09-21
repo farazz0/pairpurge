@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#1B5EAA</color>
+    <color name="ic_launcher_background">#C67139</color>
+    <!-- What the window shows before the first frame. Matching the Compose ground
+         keeps the launch from flashing the platform's white. -->
+    <color name="window_background">#F5EAD8</color>
 </resources>

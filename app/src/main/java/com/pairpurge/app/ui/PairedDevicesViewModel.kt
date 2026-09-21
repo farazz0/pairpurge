@@ -28,6 +28,10 @@ class PairedDevicesViewModel(
     private val _uiState = MutableStateFlow<PairedDevicesUiState>(PairedDevicesUiState.Loading)
     val uiState: StateFlow<PairedDevicesUiState> = _uiState.asStateFlow()
 
+    // Held here rather than only in the state, because refresh() rebuilds that state
+    // from scratch and would otherwise throw the user's choice away on every reload.
+    private var sortOrder = DeviceSortOrder.Name
+
     /** Re-reads Bluetooth state. Cheap, synchronous, local — no coroutine needed. */
     fun refresh(hasPermission: Boolean, permanentlyDenied: Boolean = false) {
         if (!hasPermission) {
@@ -50,6 +54,7 @@ class PairedDevicesViewModel(
             status = status,
             devices = devices,
             whitelistedAddresses = whitelist.addresses(),
+            sortOrder = sortOrder,
         )
     }
 
@@ -58,6 +63,18 @@ class PairedDevicesViewModel(
 
     /** Ticks or unticks every row at once. */
     fun setAllSelected(selected: Boolean) = updateDevices { it.withAllSelected(selected) }
+
+    /** Drops the whole selection, which is what the header's Clear action does. */
+    fun clearSelection() = updateDevices { it.copy(selectedAddresses = emptySet()) }
+
+    /** Flips the sort pill between the two orders the list can be read in. */
+    fun toggleSortOrder() {
+        sortOrder = when (sortOrder) {
+            DeviceSortOrder.Name -> DeviceSortOrder.Address
+            DeviceSortOrder.Address -> DeviceSortOrder.Name
+        }
+        updateDevices { it.copy(sortOrder = sortOrder) }
+    }
 
     /**
      * Requests an unpair and removes the device from the visible list when Android

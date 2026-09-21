@@ -10,7 +10,10 @@ android {
 
     defaultConfig {
         applicationId = "com.pairpurge.app"
-        minSdk = 34
+        // BLUETOOTH_CONNECT is an API 31 permission, which makes 31 the real floor:
+        // below it the app would need the legacy BLUETOOTH permissions and a runtime
+        // branch to match. Nothing else in the codebase requires a higher level.
+        minSdk = 31
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -51,7 +54,6 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.material.icons.core)
     implementation(libs.androidx.ui.tooling.preview)
     debugImplementation(libs.androidx.ui.tooling)
 

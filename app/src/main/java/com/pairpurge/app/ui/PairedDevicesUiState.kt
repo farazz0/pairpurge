@@ -3,6 +3,9 @@ package com.pairpurge.app.ui
 import com.pairpurge.app.bluetooth.BluetoothStatus
 import com.pairpurge.app.bluetooth.PairedDevice
 
+/** What the sort pill on the count row offers. */
+enum class DeviceSortOrder { Name, Address }
+
 /** Everything the paired-devices screen can show. */
 sealed interface PairedDevicesUiState {
 
@@ -29,15 +32,21 @@ sealed interface PairedDevicesUiState {
         val devices: List<PairedDevice>,
         val selectedAddresses: Set<String> = emptySet(),
         val whitelistedAddresses: Set<String> = emptySet(),
+        val sortOrder: DeviceSortOrder = DeviceSortOrder.Name,
     ) : PairedDevicesUiState {
 
         /** What the first page shows: everything the user has not whitelisted. */
         val mainDevices: List<PairedDevice>
-            get() = devices.filterNot { it.address in whitelistedAddresses }
+            get() = devices.filterNot { it.address in whitelistedAddresses }.inSortOrder(sortOrder)
 
-        /** What the whitelist page shows. Stored addresses no longer bonded stay hidden. */
+        /**
+         * What the protected page shows. Stored addresses no longer bonded stay hidden.
+         *
+         * Always by name: the sort pill belongs to the paired list, and a page with no
+         * control of its own should not silently reorder itself from another one.
+         */
         val whitelistedDevices: List<PairedDevice>
-            get() = devices.filter { it.address in whitelistedAddresses }
+            get() = devices.filter { it.address in whitelistedAddresses }.sortedForDisplay()
 
         /** False for an empty list: "all of nothing" would tick the select-all box. */
         val allSelected: Boolean
@@ -71,6 +80,7 @@ fun derivePairedDevicesState(
     status: BluetoothStatus,
     devices: List<PairedDevice>,
     whitelistedAddresses: Set<String> = emptySet(),
+    sortOrder: DeviceSortOrder = DeviceSortOrder.Name,
 ): PairedDevicesUiState = when {
     !hasPermission -> PairedDevicesUiState.NeedsPermission(permanentlyDenied)
     status == BluetoothStatus.UNSUPPORTED -> PairedDevicesUiState.BluetoothUnsupported
@@ -79,8 +89,16 @@ fun derivePairedDevicesState(
     else -> PairedDevicesUiState.Devices(
         devices = devices.sortedForDisplay(),
         whitelistedAddresses = whitelistedAddresses,
+        sortOrder = sortOrder,
     )
 }
+
+/** Applies whichever order the sort pill is currently showing. */
+internal fun List<PairedDevice>.inSortOrder(order: DeviceSortOrder): List<PairedDevice> =
+    when (order) {
+        DeviceSortOrder.Name -> sortedForDisplay()
+        DeviceSortOrder.Address -> sortedBy { it.address }
+    }
 
 /**
  * Named devices first (case-insensitive), unnamed last, ties broken by address.

@@ -3,15 +3,28 @@
 Android app for bulk-managing paired Bluetooth devices.
 
 Lists every device currently bonded with the phone, with its name, MAC address, and
-the total count. Each row also has an **Unpair** action for removing that bond.
+the total count. Each row has an **Unpair** action, and a pill above the list switches
+between name and address order.
 
-Rows can be selected with checkboxes (or all at once via the header). While a
-selection exists, the top bar shows two bulk actions: a trash icon that unpairs the
-selected devices and a star icon that moves them to the **whitelist**. Whitelisted
-devices are hidden from the main list and shown on their own page, reached through
-the hamburger menu; each has a **Remove** action that returns it to the main list.
-The whitelist is persisted (keyed by MAC address), so it survives restarts and even
-re-pairing the same device.
+Rows can be selected with checkboxes (or all at once from the count row). While a
+selection exists, a bottom action bar takes the place of the navigation and offers
+**Protect** and **Unpair** for the whole selection; unpairing asks for confirmation
+first. Protected devices are hidden from the main list and get their own tab, each
+with a **Remove** action that returns it. The protected list is persisted (keyed by
+MAC address), so it survives restarts and even re-pairing the same device.
+
+The **Settings** tab offers **Delete connections after N days**, off by default.
+Choose 1–3650 days and save. Each Bluetooth connection resets the timer, and time
+spent connected does not count as inactivity. Devices with no recorded connection
+start their timer when PairPurge first observes them. Protected devices are excluded.
+Cleanup runs when opening the app and roughly every six hours in the background;
+Android may delay it. Bluetooth must be on and its permission granted. Failed unpair
+requests are retried on later checks. If the phone blocks the connection-state check,
+automatic cleanup skips that device. Force-stopping the app prevents tracking until
+it is opened again. Shortening the period can make existing devices eligible.
+
+Connection tracking uses Android's [Bluetooth connection broadcasts](https://developer.android.com/reference/android/bluetooth/BluetoothDevice#ACTION_ACL_CONNECTED),
+which are [allowed in manifest receivers](https://developer.android.com/develop/background-work/background-tasks/broadcasts/broadcast-exceptions).
 
 Android does not provide bond removal in its public SDK, so direct unpairing uses the
 hidden `BluetoothDevice.removeBond()` method. PairPurge handles devices that block
@@ -19,7 +32,7 @@ that method without crashing, but support can vary by Android release and phone 
 
 ## Requirements
 
-- Android 14 (API 34) or newer on the device
+- Android 12 (API 31) or newer on the device
 - Android Studio (its bundled JBR is the only JDK this project needs)
 
 ## Build
@@ -37,7 +50,7 @@ from the IDE need no extra setup.
 ## Run on a physical device
 
 No special build configuration is needed — the debug APK is signed with the local
-debug keystore and installs on any Android 14+ phone. Only the connection has to be
+debug keystore and installs on any Android 12+ phone. Only the connection has to be
 set up.
 
 ```bash
@@ -45,7 +58,7 @@ set up.
 ```
 
 Builds, installs, and launches the app, and refuses clearly if no device is attached
-or the phone is older than API 34. Useful flags:
+or the phone is older than API 31. Useful flags:
 
 | Flag | Effect |
 | --- | --- |
@@ -79,12 +92,36 @@ Or plain Gradle, if the phone is already connected:
 ./gradlew installDebug
 ```
 
+## Release build
+
+Release signing reads `keystore.properties` from the repository root. That file and
+the keystore are gitignored; without them the release build still runs but comes out
+unsigned, so a fresh clone needs no setup to build debug or run tests.
+
+Generate an upload key once:
+
+```bash
+keytool -genkeypair -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+```
+
+Then copy `keystore.properties.example` to `keystore.properties` and fill in the
+passwords. Build the artifact Play expects:
+
+```bash
+./gradlew bundleRelease
+```
+
+The `.aab` lands in `app/build/outputs/bundle/release/`. **Back up the keystore.** It
+is the only key that can publish updates to this app — losing it means the listing
+can never be updated again.
+
 ## Permissions
 
-`BLUETOOTH_CONNECT` only. There is deliberately **no** location permission —
+`BLUETOOTH_CONNECT` for Bluetooth access and `RECEIVE_BOOT_COMPLETED` to persist
+the cleanup schedule across restarts. There is deliberately **no** location permission —
 `ACCESS_FINE_LOCATION` is required for Bluetooth *scanning*, which this app does not
-do. `minSdk 34` also means the legacy `BLUETOOTH` / `BLUETOOTH_ADMIN` permissions are
-unnecessary.
+do. `minSdk 31` also means the legacy `BLUETOOTH` / `BLUETOOTH_ADMIN` permissions are
+unnecessary — they are `maxSdkVersion="30"` shims, so no supported device reads them.
 
 ## Version pinning
 
@@ -105,7 +142,7 @@ matches it.
 ## Architecture
 
 ```
-PairedDevicesScreen      Compose: permission launcher, drawer nav, renders state
+PairedDevicesScreen      Compose: permission launcher, bottom nav, renders state
         │  refresh(hasPermission, permanentlyDenied)
         ▼
 PairedDevicesViewModel   StateFlow<PairedDevicesUiState>
@@ -118,7 +155,34 @@ BluetoothDeviceSource    interface          WhitelistStore    interface
 All screen-selection logic lives in `derivePairedDevicesState`, a pure function, so
 the app's behaviour is unit-tested on the JVM with no device or emulator involved.
 
+## Design
+
+The UI follows the Organic system from the *PairPurge Screens* design doc: cream
+ground, terracotta primary, sage for the protected role, Space Grotesk on headings
+and buttons, Figtree everywhere else, and pills in place of Material's rectangles.
+Material 3 still supplies the touch targets, list rhythm and tri-state select-all.
+
+Colour is load-bearing — terracotta reads as destructive, sage as protected, so the
+star and the trash never look alike. **Dynamic colour is therefore off**: recolouring
+from the wallpaper would collapse that distinction.
+
+`ui/theme/` holds the whole system. `Color.kt` carries roles Material has no slot for
+(the tint a selected row takes, the protected colour); `PairPurgeIcons.kt` transcribes
+the design's stroked icons rather than pulling in `material-icons-extended` for glyphs
+in the wrong style. Every screen has an `@Preview` at the bottom of
+`ui/PairedDevicesScreen.kt`, including states that are awkward to reach on a device.
+
+Both fonts are bundled variable fonts under `app/src/main/res/font/`, used under the
+SIL Open Font License — see `licenses/`.
+
+One naming note: the UI says **Protected devices**, but the code underneath still
+says `whitelist` (`WhitelistStore`, `whitelistedAddresses`, and the persisted
+SharedPreferences key). Renaming those would mean migrating stored data for no
+behavioural gain, so the copy change stops at the surface.
+
 ## Docs
 
 - Design spec: `docs/superpowers/specs/2026-08-07-paired-bluetooth-devices-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-08-07-paired-bluetooth-devices.md`
+- Screen designs: `PairPurge Screens.dc.html` in the *PairPurge design brief* project
+  on [claude.ai/design](https://claude.ai/design/p/2af5abd7-9eee-4222-9ac0-eeedeb9b2950)

@@ -19,7 +19,15 @@ class PairedDevicesUiStateTest {
         status: BluetoothStatus = BluetoothStatus.READY,
         devices: List<PairedDevice> = emptyList(),
         whitelistedAddresses: Set<String> = emptySet(),
-    ) = derivePairedDevicesState(hasPermission, permanentlyDenied, status, devices, whitelistedAddresses)
+        sortOrder: DeviceSortOrder = DeviceSortOrder.Name,
+    ) = derivePairedDevicesState(
+        hasPermission,
+        permanentlyDenied,
+        status,
+        devices,
+        whitelistedAddresses,
+        sortOrder,
+    )
 
     @Test
     fun `missing permission asks for permission`() {
@@ -261,5 +269,34 @@ class PairedDevicesUiStateTest {
         ) as PairedDevicesUiState.Devices
 
         assertFalse(state.allSelected)
+    }
+
+    @Test
+    fun `sorting by name puts named devices first and unnamed last`() {
+        val state = derive(devices = listOf(unnamed, headphones, car)) as PairedDevicesUiState.Devices
+
+        assertEquals(listOf(car, headphones, unnamed), state.mainDevices)
+    }
+
+    @Test
+    fun `sorting by address ignores the name order entirely`() {
+        val state = derive(
+            devices = listOf(unnamed, headphones, car),
+            sortOrder = DeviceSortOrder.Address,
+        ) as PairedDevicesUiState.Devices
+
+        assertEquals(listOf(headphones, car, unnamed), state.mainDevices)
+    }
+
+    @Test
+    fun `the protected list stays in name order whatever the sort pill says`() {
+        val everything = setOf(headphones.address, car.address, unnamed.address)
+        val state = derive(
+            devices = listOf(unnamed, headphones, car),
+            whitelistedAddresses = everything,
+            sortOrder = DeviceSortOrder.Address,
+        ) as PairedDevicesUiState.Devices
+
+        assertEquals(listOf(car, headphones, unnamed), state.whitelistedDevices)
     }
 }

@@ -29,6 +29,19 @@ class SystemBluetoothDeviceSource(context: Context) : BluetoothDeviceSource {
         emptyList()
     }
 
+    /** Null means connection state could not be verified, so automatic cleanup must skip it. */
+    @SuppressLint("MissingPermission", "PrivateApi")
+    fun isConnected(address: String): Boolean? = try {
+        val device = adapter?.getRemoteDevice(address)
+        device?.javaClass?.getMethod("isConnected")?.invoke(device) as? Boolean
+    } catch (_: ReflectiveOperationException) {
+        null
+    } catch (_: SecurityException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    }
+
     /**
      * Android does not expose bond removal in its public SDK. The hidden method is
      * used deliberately here so PairPurge can perform its core action without sending

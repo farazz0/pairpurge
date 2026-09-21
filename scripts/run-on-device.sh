@@ -189,8 +189,8 @@ release=$("$ADB" -s "$serial" shell getprop ro.build.version.release | tr -d '\r
 sdk=$("$ADB" -s "$serial" shell getprop ro.build.version.sdk | tr -d '\r')
 echo "Device: $model — Android $release (API $sdk) [$serial]"
 
-if [[ "$sdk" -lt 34 ]]; then
-    echo "This app needs Android 14 (API 34) or newer; this device is API $sdk." >&2
+if [[ "$sdk" -lt 31 ]]; then
+    echo "This app needs Android 12 (API 31) or newer; this device is API $sdk." >&2
     exit 1
 fi
 
