@@ -13,3 +13,6 @@ captures/
 keystore.properties
 *.jks
 *.keystore
+
+# Local-only working files, e.g. Play store listing assets.
+/local/
